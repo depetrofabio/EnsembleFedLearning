@@ -59,13 +59,3 @@ Run `experiments/ensemble_dirichlet_only.ipynb` for the main method.
     1.  **Warmup**: Clients train locally for 2 epochs.
     2.  **Clustering**: Server groups clients based on weight updates.
     3.  **Ensemble Training**: Clients train their cluster-specific backbone + shared classifier.
-
-## Methodology Highlights
-
-The method uses a **Sparse Forward Pass** during training:
-$$ y = g\left( \frac{[\mathbf{0}, \dots, f_m(x), \dots, \mathbf{0}]}{1} \right) $$
-
-And a **Dense Normalized Pass** during inference:
-$$ y = g\left( \frac{[f_1(x), \dots, f_M(x)]}{M} \right) $$
-
-This allows the single linear classifier to effectively "average" the decisions of multiple specialized experts.
