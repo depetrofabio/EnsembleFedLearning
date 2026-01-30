@@ -1,0 +1,15 @@
+{
+    "num_clients": 20,
+    "num_rotation_clusters": 4,
+    "num_clusters_model": 4,
+    "seed": 42,
+    "model_name": "resnet18",
+    "pretrained": false,
+    "batch_size": 64,
+    "lr": 0.01,
+    "warmup_epochs": 2,
+    "local_epochs": 2,
+    "training_rounds": 20,
+    "fedavg_rounds": 21,
+    "client_fraction": 1
+}
