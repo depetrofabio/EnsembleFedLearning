@@ -27,7 +27,6 @@ Our framework proposes a novel **Cluster-Personalized Backbone, Shared Classifie
 │   ├── clustering_analysis.ipynb      # Validation: Analyzing clustering fidelity on Rotated CIFAR-10
 │   └── config.json                    # Global configuration parameters
 │
-├── paper_full_body.tex     # Draft of the research paper
 └── README.md               # This file
 ```
 
