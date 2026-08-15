@@ -1,0 +1,13 @@
+{
+  "_comment": "Control: feature heterogeneity ONLY (rotations, near-IID labels). This is where cluster specialisation should pay off most, so it is the cleanest test of whether the ensemble mechanism works at all before label skew is added.",
+  "num_clients": 40, "alpha": 100.0, "rotation_groups": [0, 1, 2, 3], "num_clusters": 4,
+  "cluster_signal": "act_stats", "pca_dim": 32,
+  "warmup_signals": ["delta_l4fc", "delta_stem", "act_stats"],
+  "warmup_fedavg_rounds": 1, "warmup_local_epochs": 2, "warmup_act_batches": 8,
+  "rounds": 100, "fraction": 0.25, "local_epochs": 2, "eval_every": 20,
+  "batch_size": 64, "lr": 0.01,
+  "combiners": ["uniform", "beta", "gate", "mlp"],
+  "dense_rounds": 5, "dense_fraction": 0.25,
+  "run_fedavg": true, "subset_analysis": true, "seed": 42,
+  "output_dir": "./hefl/results/rotation_only_seed42"
+}

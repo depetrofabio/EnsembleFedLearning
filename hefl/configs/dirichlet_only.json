@@ -1,0 +1,13 @@
+{
+  "_comment": "Control: label heterogeneity ONLY (no rotations). Expect the ensemble to gain little here - all experts see the same input distribution and converge to near-identical functions, so there is nothing to combine. This is the honest limitation setting, not a headline result.",
+  "num_clients": 40, "alpha": 0.5, "rotation_groups": [0], "num_clusters": 4,
+  "cluster_signal": "delta_l4fc", "pca_dim": 32,
+  "warmup_signals": ["delta_l4fc", "delta_stem", "act_stats"],
+  "warmup_fedavg_rounds": 1, "warmup_local_epochs": 2, "warmup_act_batches": 8,
+  "rounds": 100, "fraction": 0.25, "local_epochs": 2, "eval_every": 20,
+  "batch_size": 64, "lr": 0.01,
+  "combiners": ["uniform", "beta", "gate", "mlp"],
+  "dense_rounds": 5, "dense_fraction": 0.25,
+  "run_fedavg": true, "subset_analysis": true, "seed": 42,
+  "output_dir": "./hefl/results/dirichlet_only_seed42"
+}
