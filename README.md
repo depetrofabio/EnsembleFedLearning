@@ -1,164 +1,216 @@
-
 # Hierarchical Ensemble Federated Learning
 
-This repository contains the implementation and experimental code for the paper **"Hierarchical Ensemble Federated Learning for Combined Feature and Label Heterogeneity"**.
+**Federated learning when clients differ in *two* ways at once: what their
+images look like, and which classes they hold.**
 
-Our framework proposes a novel **Cluster-Personalized Backbone, Shared Classifier** architecture designed to tackle the "conflicting gradient" problem in Federated Learning environments where clients suffer from both feature shifts (e.g., image rotations) and label skews (Dirichlet distribution).
-
-## Key Features
-
-*   **Weight-Based Clustering**: Groups clients based on the deep layer parameter updates ($\Delta \theta_{L4}, \Delta \theta_{FC}$) obtained during a local warmup phase.
-*   **Hierarchical Ensemble**: Maintains $M$ specialized feature extractors (one per cluster) but shares a single global classifier to unify the label space.
-*   **Active Normalization**: A specifically designed forward pass that allows the classifier to handle sparse inputs during training (1 active backbone) and dense inputs during inference (all active backbones) without magnitude mismatch.
-*   **Privacy-Preserving**: Clustering and training are performed without ever sharing raw client data.
-
-## Repository Structure
-
-```
-├── training/
-│   ├── ensemble_fl.py      # Core logic for the Ensemble FL orchestrator (warmup, clustering, training)
-│   ├── ensemble_model.py   # PyTorch definitions for the Ensemble and ResNet wrappers
-│   └── utils.py            # Helper functions for training and evaluation
-│
-├── experiments/
-│   ├── centralized_training.ipynb     # Baseline: Single model trained on central data (No Augmentation)
-│   ├── fedavg_dirichlet_only.ipynb      # Baseline: Standard FedAvg under Label Heterogeneity
-│   ├── ensemble_dirichlet_only.ipynb    # Main Method: Hierarchical Ensemble under Label Heterogeneity
-│   ├── clustering_analysis.ipynb      # Validation: Analyzing clustering fidelity on Rotated CIFAR-10
-│   └── config.json                    # Global configuration parameters
-│
-└── README.md               # This file
-```
-
-## Setup & Requirements
-
-The code is implemented in **Python 3.8+** using **PyTorch**.
-
-To install dependencies:
-```bash
-pip install torch torchvision scikit-learn matplotlib seaborn numpy
-```
-
-## Running Experiments
-
-### 1. Baselines
-To establish performance benchmarks, we use two baselines:
-*   **Centralized**: Run `experiments/centralized_training.ipynb` to train a ResNet-18 on the full dataset with a 90/10 Train/Val split and no data augmentation.
-*   **FedAvg**: Run `experiments/fedavg_dirichlet_only.ipynb` to evaluate standard Federated Averaging under a Dirichlet ($\alpha=0.5$) non-IID distribution.
-
-### 2. Clustering Validation
-Run `experiments/clustering_analysis.ipynb` to verify the grouping mechanism.
-*   **Scenario**: Clients are assigned to 4 fixed rotation groups ($0^\circ, 90^\circ, 180^\circ, 270^\circ$).
-*   **Goal**: Confirm that K-Means on weight differences successfully recovers these ground-truth groups (High ARI score).
-
-### 3. Ensemble Training (Notebooks)
-Run `experiments/ensemble_dirichlet_only.ipynb` for the main method.
-*   **Scenario**: Standard CIFAR-10 (No Rotations) with Dirichlet label heterogeneity.
-*   **Process**:
-    1.  **Warmup**: Clients train locally for 2 epochs.
-    2.  **Clustering**: Server groups clients based on weight updates.
-    3.  **Ensemble Training**: Clients train their cluster-specific backbone + shared classifier.
-
-### 4. Running Experiments with `run_ensemble.py`
-
-For systematic experimentation and reproducibility, use the `run_ensemble.py` script with flexible configuration options.
-
-#### Quick Start
+Cluster clients by domain, give each cluster its own feature extractor, and
+learn how to combine those experts behind a shared classifier. Evaluated on
+CIFAR-10 with combined **feature shift** (image rotations) and **label skew**
+(Dirichlet partitioning).
 
 ```bash
-# Run with default configuration
-python run_ensemble.py --config config.json
-
-# Quick test with fewer clients and rounds
-python run_ensemble.py --config config_quick_test.json
-
-# Override specific parameters via CLI
-python run_ensemble.py --config config.json --num_clients 50 --lr 0.001
+pip install -r requirements.txt
+python -m hefl.run --config hefl/configs/rotation_dirichlet.json
 ```
 
-#### Configuration Options
+---
 
-The script supports configuration via both JSON files and command line arguments (CLI overrides JSON):
+## The finding
 
-**Key Parameters:**
-- `num_clients`: Number of federated clients (default: 100)
-- `num_clusters`: Number of clusters for ensemble (default: 5)
-- `alpha`: Dirichlet distribution parameter (lower = more non-IID, default: 0.5)
-- `batch_size`: Training batch size (default: 64)
-- `lr`: Learning rate (default: 0.01)
-- `warmup_rounds`: Warmup phase rounds (default: 1)
-- `warmup_local_epochs`: Local epochs during warmup (default: 2)
-- `use_fedavg_warmup`: Use FedAvg warmup (default: False)
-- `use_weight_diff`: Use weight differences for clustering (default: True)
-- `clustering_method`: Clustering approach - `kmeans` (default: kmeans)
-- `ensemble_rounds`: Main training rounds (default: 50)
-- `seed`: Random seed for reproducibility (default: 42)
+Clients can be grouped by their **domain** using spatially-gridded activation
+statistics from a **frozen, untrained** network — 320 dimensions, one forward
+pass per client, **no local training at all**:
 
-**Complete parameter list**: Run `python run_ensemble.py --help`
+| clustering signal | dimension | ARI vs rotation | ARI vs label |
+|---|---|---|---|
+| `layer4 + fc` update *(the usual choice)* | 8,398,848 | 0.547 | 0.065 |
+| stem weight update | 149,824 | 0.145 | 0.102 |
+| **gridded activation statistics** | **320** | **1.000** | 0.025 |
 
-#### Example Experiments
+*40 clients, 4 rotation groups, Dirichlet α = 0.5, full CIFAR-10, seed 42.*
 
-**Experiment 1: Varying Number of Clusters**
+Two things make this worth reporting:
+
+- **The spatial grid is the whole trick.** Pooling each channel over the entire
+  feature map collapses to ARI 0.09 once labels skew, because it discards
+  exactly what a rotation changes. A 2×2 grid keeps the spatial layout — *sky at
+  the top* vs *sky on the left* — which is a direct signature of the domain.
+- **Measuring the input beats measuring the gradient.** The stem *update*
+  targets the same layers the activation probe reads, yet reaches only 0.145:
+  how weights respond to data is dominated by dataset size and label
+  composition; the input distribution itself is not.
+
+Reproduce it in about a minute, CPU only:
+**[`notebooks/02_clustering_signals.ipynb`](notebooks/02_clustering_signals.ipynb)**
+
+Honest caveat: ARI = 1.00 from an *untrained* network means 90° rotations are an
+easy shift to detect. This is strong evidence that 8.4M-dimensional gradient
+signatures are unnecessary, and weak evidence that the approach transfers to
+subtler domain gaps. See [`docs/REPORT.md`](docs/REPORT.md) §10.2.
+
+---
+
+## Method
+
+```
+        ┌── backbone_1 ──► head_1 ──► ℓ_1 ┐
+  x ────┼── backbone_2 ──► head_2 ──► ℓ_2 ├──► Σ_k w_k·ℓ_k + b
+        └── backbone_K ──► head_K ──► ℓ_K ┘         ▲
+                                                 combiner
+```
+
+A client trains through **one** expert. The combination is trained separately in
+*dense rounds*, where the experts are frozen and all K are active — this is the
+step that makes `w` a learned object rather than a hardcoded constant.
+
+| combiner | params | weights | note |
+|---|---|---|---|
+| `uniform` | 0 | `1/\|A\|` | reproduces the classic formulation exactly |
+| `beta` | K | `softmax(β)` | one global scalar per expert, interpretable |
+| `gate` | ~1k | `softmax(g(conf(x)))` | **input-dependent** — the one that matters under feature shift |
+| `mlp` | ~5k | — | genuine cross-expert interaction |
+
+Every weight-producing combiner normalises over the active subset, so a lone
+active expert receives weight exactly 1. The function a client optimises locally
+is therefore *identical* to what the ensemble computes with only that expert
+active — verified to zero error in the test suite. That removes the train/test
+mismatch structurally instead of correcting it with a scale factor.
+
+Full derivation and design rationale: **[`docs/REPORT.md`](docs/REPORT.md)**.
+
+---
+
+## Results
+
+*40 clients · full CIFAR-10 · 4 rotation groups · Dirichlet α = 0.5 · ResNet-18 from
+scratch · 100 rounds at 25 % participation · seed 42. No augmentation anywhere, so
+absolute numbers are low by construction — the relative ordering is the result.*
+
+| method | test accuracy | |
+|---|---|---|
+| **oracle expert** | **0.3587** | ceiling: per-sample domain known |
+| `uniform` combination | 0.3478 | parameter-free |
+| `beta` combination | 0.3442 | 4 learned params |
+| `mlp` combination | 0.3409 | 7,050 learned params |
+| `gate` combination | 0.3139 | routing accuracy **0.273** vs 0.25 chance |
+| FedAvg (single model) | *pending* | identical backbone, rounds, participation |
+
+Three things this establishes:
+
+**Clustering recovers the domain structure exactly.** The oracle's best-expert-per-rotation
+choice is a **bijection** — `{0°→e1, 90°→e2, 180°→e0, 270°→e3}`. Every expert wins on
+exactly one domain and none wins twice. Undifferentiated experts could not produce that.
+
+**The headroom for learned routing is only +1.1 points** (0.3478 → 0.3587). Parameter-free
+averaging captures ~90 % of everything optimal expert selection could achieve, which makes
+a learned router a poor trade before you even build one.
+
+**The learned gate fails, and the failure is diagnosed.** It routes at chance because it is
+fed *confidence summaries* (per-expert entropy, max-probability, margin) rather than the
+input image — when experts are not confidently distinguishable, that summary carries no
+signal and the gate degenerates. Choosing a cheap routing input was the wrong trade;
+a small CNN on `x` would be robust to it, at the cost of one forward pass. Reported rather
+than dropped, because the measured +1.1-point ceiling is the more useful finding.
+
+---
+
+## Notebooks
+
+Read in order; the first two need no GPU.
+
+| | | runtime |
+|---|---|---|
+| [`01_heterogeneity.ipynb`](notebooks/01_heterogeneity.ipynb) | build the benchmark, visualise both shift axes | ~1 min |
+| [`02_clustering_signals.ipynb`](notebooks/02_clustering_signals.ipynb) | **reproduces the headline result**, grid ablation, α sweep | ~2 min |
+| [`03_run_experiment.ipynb`](notebooks/03_run_experiment.ipynb) | architecture walkthrough + end-to-end pipeline run | ~15 min |
+| [`04_results.ipynb`](notebooks/04_results.ipynb) | expert matrix, method comparison, curves, subset analysis | instant |
+| [`05_colab_gpu.ipynb`](notebooks/05_colab_gpu.ipynb) | the full experimental matrix on a cloud GPU | hours |
+
+---
+
+## Reproducing everything
+
 ```bash
-# Test different cluster configurations
-python run_ensemble.py --config config.json --num_clusters 3 --output_dir ./results_k3
-python run_ensemble.py --config config.json --num_clusters 5 --output_dir ./results_k5
-python run_ensemble.py --config config.json --num_clusters 10 --output_dir ./results_k10
+bash scripts/run_sweep.sh tier1     # ~15 runs
+python -m hefl.aggregate            # -> mean ± std tables
 ```
 
-**Experiment 2: Different Non-IID Levels**
+**tier1** is the minimum defensible set: the main setting × 3 seeds, the two
+single-axis controls (`rotation_only`, `dirichlet_only`), and the `random` /
+`oracle` cluster-assignment ablations.
+
+That last pair is not optional. *K* models beating one model is a **capacity
+confound** until random assignment is shown to be worse than learned assignment.
+
+**tier2** sweeps number of clusters, α, clustering signal, dense-round mode, and
+logit adjustment.
+
+Runs are independent and the script skips anything already finished, so the
+matrix is resumable and splittable across machines. Budget ~1–1.5 h per run on a
+T4, ~30 min on an A100.
+
+---
+
+## Layout
+
+```
+hefl/                  the package
+├── datasets.py        rotation groups, Dirichlet split, per-rotation val/test
+├── models.py          backbones, per-expert heads, four combiners
+├── clustering.py      four clustering signals, K-means, ARI against both axes
+├── federated.py       expert rounds, cluster-local aggregation, dense rounds
+├── evaluation.py      per-rotation tables, expert matrix, oracle, routing
+├── baselines.py       FedAvg, centralized, random/oracle assignment
+├── run.py             one-command pipeline
+├── aggregate.py       collects finished runs into paper-ready tables
+├── test_invariants.py 14 structural invariants
+└── configs/           smoke · fast · rotation_only · dirichlet_only · main
+
+notebooks/             01–05, see above
+scripts/run_sweep.sh   the full experimental matrix
+docs/REPORT.md         implementation report: every step and its rationale
+docs/METHOD.md         technical description of the original formulation
+```
+
+---
+
+## Tests
+
 ```bash
-# High heterogeneity (very non-IID)
-python run_ensemble.py --config config.json --alpha 0.1 --output_dir ./results_alpha_0.1
-
-# Medium heterogeneity
-python run_ensemble.py --config config.json --alpha 0.5 --output_dir ./results_alpha_0.5
-
-# Low heterogeneity (more IID)
-python run_ensemble.py --config config.json --alpha 10.0 --output_dir ./results_alpha_10
+python -m hefl.test_invariants
 ```
 
-**Experiment 3: Clustering Method Comparison**
-```bash
-# Gradient-based clustering (KMeans on weight differences)
-python run_ensemble.py --config config.json --clustering_method kmeans
+14 checks on the properties that are easy to break silently: that `uniform`
+reproduces the classic forward pass, that single-expert evaluation equals local
+client training exactly, that combination weights sum to 1 over every subset,
+that aggregation does not dilute updates, and that both dense-round modes move
+the combiner.
 
-# Feature-based clustering
-python run_ensemble.py --config config.json --clustering_method features
-```
+---
 
-**Experiment 4: Extended Training**
-```bash
-# More warmup and training rounds
-python run_ensemble.py \
-    --config config.json \
-    --warmup_rounds 5 \
-    --warmup_local_epochs 5 \
-    --ensemble_rounds 100 \
-    --output_dir ./results_extended
-```
+## Status
 
-#### Output Structure
+**Done** — clustering study (3 seeds, grid ablation, four signals compared); full-scale
+run at α = 0.5 with all four combiners and the oracle ceiling; implementation with
+14/14 invariants passing; harness, configs, aggregation and baselines.
 
-Results are saved to the specified output directory:
-```
-results/
-├── training_history.json         # Loss & accuracy per round
-├── config_used.json              # Configuration for reproducibility
-└── models/
-    ├── cluster_model_0.pth       # Cluster-specific feature extractors
-    ├── cluster_model_1.pth
-    ├── ...
-    ├── ensemble_classifier.pth   # Shared global classifier
-    └── client_clusters.json      # Client-to-cluster assignments
-```
+**In progress** — the FedAvg row of the results table.
 
-#### Google Colab
+**Not done** — multiple seeds and the `random` / `oracle` *assignment* ablations
+(both in `tier1` of the sweep, compute-bound not code-bound); α = 0.1; comparisons
+against FedBN, IFCA, CFL, LG-FedAvg, FedRoD; any dataset beyond CIFAR-10 or any
+non-synthetic feature shift.
 
-For cloud-based experimentation, use the provided Colab notebook:
+Until the random-assignment control runs, any ensemble-vs-FedAvg gap is **not
+attributable** to clustering — K experts carry K× the parameters, and that confound
+has to be excluded before the comparison means anything.
 
-1. Upload `ensemble_training_colab.ipynb` to [Google Colab](https://colab.research.google.com)
-2. Enable GPU: Runtime → Change runtime type → GPU
-3. Follow the notebook cells to setup and run experiments
+Known limitations are documented rather than omitted —
+[`docs/REPORT.md`](docs/REPORT.md) §12, including K× inference cost, the absence
+of top-1 routing, and the gate's collapse mode when experts are undertrained.
 
-See [`ENSEMBLE_TRAINING_GUIDE.md`](ENSEMBLE_TRAINING_GUIDE.md) for detailed documentation and troubleshooting.
+---
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).
