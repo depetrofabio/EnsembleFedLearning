@@ -8,6 +8,14 @@ learn how to combine those experts behind a shared classifier. Evaluated on
 CIFAR-10 with combined **feature shift** (image rotations) and **label skew**
 (Dirichlet partitioning).
 
+> **Headline result: personalising the feature extractor loses to plain FedAvg on this
+> benchmark — and every component worked.** Clustering recovers client domains perfectly
+> (ARI 1.000), experts specialise cleanly, ensembling beats any single expert. Yet FedAvg
+> wins by 14 points, and sharing more of the network monotonically closes the gap
+> (44.7M params → 0.3478; 11.6M shared-trunk → 0.4036; FedAvg 11.2M → 0.4895).
+> Partitioning clients starves each expert of data, and 90° rotations were never a hard
+> enough shift to pay for that. [Full tables and analysis ↓](#results)
+
 ```bash
 pip install -r requirements.txt
 python -m hefl.run --config hefl/configs/rotation_dirichlet.json
@@ -15,7 +23,7 @@ python -m hefl.run --config hefl/configs/rotation_dirichlet.json
 
 ---
 
-## The finding
+## The clustering finding
 
 Clients can be grouped by their **domain** using spatially-gridded activation
 statistics from a **frozen, untrained** network — 320 dimensions, one forward
@@ -86,31 +94,79 @@ Full derivation and design rationale: **[`docs/REPORT.md`](docs/REPORT.md)**.
 scratch · 100 rounds at 25 % participation · seed 42. No augmentation anywhere, so
 absolute numbers are low by construction — the relative ordering is the result.*
 
-| method | test accuracy | |
-|---|---|---|
-| **oracle expert** | **0.3587** | ceiling: per-sample domain known |
-| `uniform` combination | 0.3478 | parameter-free |
-| `beta` combination | 0.3442 | 4 learned params |
-| `mlp` combination | 0.3409 | 7,050 learned params |
-| `gate` combination | 0.3139 | routing accuracy **0.273** vs 0.25 chance |
-| FedAvg (single model) | *pending* | identical backbone, rounds, participation |
+| method | 0° | 90° | 180° | 270° | **overall** |
+|---|---|---|---|---|---|
+| **FedAvg** (single model) | 0.4927 | 0.5017 | 0.4751 | 0.4886 | **0.4895** |
+| oracle expert *(ensemble ceiling)* | 0.4046 | 0.4352 | 0.2112 | 0.3839 | 0.3587 |
+| ensemble, `uniform` | 0.3519 | 0.3834 | 0.3172 | 0.3386 | 0.3478 |
+| ensemble, `beta` | 0.2696 | 0.4492 | 0.3007 | 0.3571 | 0.3442 |
+| ensemble, `mlp` | 0.3543 | 0.4359 | 0.2261 | 0.3474 | 0.3409 |
+| ensemble, `gate` | 0.2130 | 0.4445 | 0.2064 | 0.3918 | 0.3139 |
+| expert 0 alone | 0.1317 | 0.1022 | **0.2112** | 0.1144 | 0.1399 |
+| expert 1 alone | **0.4046** | 0.1400 | 0.2085 | 0.1478 | 0.2252 |
+| expert 2 alone | 0.1977 | **0.4352** | 0.1920 | 0.2356 | 0.2651 |
+| expert 3 alone | 0.1711 | 0.1927 | 0.1723 | **0.3839** | 0.2300 |
 
-Three things this establishes:
+## FedAvg wins, by 14 points — and every component of the method worked
 
-**Clustering recovers the domain structure exactly.** The oracle's best-expert-per-rotation
-choice is a **bijection** — `{0°→e1, 90°→e2, 180°→e0, 270°→e3}`. Every expert wins on
-exactly one domain and none wins twice. Undifferentiated experts could not produce that.
+This is the headline, and it is a negative result worth reporting precisely because
+nothing broke along the way:
 
-**The headroom for learned routing is only +1.1 points** (0.3478 → 0.3587). Parameter-free
-averaging captures ~90 % of everything optimal expert selection could achieve, which makes
-a learned router a poor trade before you even build one.
+- **Clustering was perfect.** ARI 1.000 against the rotation ground truth, clusters
+  `[10,10,10,10]`.
+- **The experts specialised.** Bold cells above are each expert's best domain — a clean
+  **bijection**, every expert winning exactly one rotation, each ~2× better on its own
+  domain than off it. Undifferentiated experts cannot produce that pattern.
+- **Ensembling helped.** `uniform` (0.3478) beats the best single expert (0.2651).
+- **The method still loses**, because the **oracle ceiling (0.3587) sits below FedAvg
+  (0.4895)**. Even with each sample's true domain known, the specialists cannot match one
+  model trained on everything. No combiner can rescue this — the ceiling is the ceiling.
 
-**The learned gate fails, and the failure is diagnosed.** It routes at chance because it is
-fed *confidence summaries* (per-expert entropy, max-probability, margin) rather than the
-input image — when experts are not confidently distinguishable, that summary carries no
-signal and the gate degenerates. Choosing a cheap routing input was the wrong trade;
-a small CNN on `x` would be robust to it, at the cost of one forward pass. Reported rather
-than dropped, because the measured +1.1-point ceiling is the more useful finding.
+The cause is arithmetic, not a bug: partitioning 40 clients into 4 clusters gives each
+expert **a quarter of the data** (~10k images for a ResNet-18 trained from scratch), while
+FedAvg's single model sees all 40k. **Data-splitting cost exceeded specialisation benefit.**
+And 90° rotations are exactly what rotation augmentation does — a single CNN absorbs them
+at modest capacity cost, so the gradient-conflict this method is designed to avoid was
+never severe enough to pay for quartering the dataset.
+
+### Two secondary findings
+
+**Learned combination lost to parameter-free averaging.** Optimal routing is worth only
+**+1.1 points** over `uniform` (0.3478 → 0.3587), and every learned combiner scored below
+it. Measuring that ceiling *before* investing in a router is the transferable lesson.
+
+**The gate failed, and the cause is identified.** Routing accuracy **0.273** vs 0.25
+chance. It is fed per-expert *confidence summaries* rather than the input image, to keep
+it at ~1k parameters; when experts are not confidently distinguishable that summary
+carries no signal and the gate degenerates. A small CNN on `x` would fix it — but the
++1.1-point ceiling says it would not be worth the forward pass.
+
+### Follow-up: how much personalisation does this problem actually need?
+
+If data-splitting is the binding constraint, sharing more of the network should help.
+`hefl/split.py` implements a **split-depth** architecture: per-cluster early blocks, one
+globally-shared trunk aggregated over *all* clients. `split_depth` is a dial with both
+baselines as endpoints — 0 is a shared backbone, 5 is fully independent experts.
+
+| architecture | personalised | params | test accuracy | vs FedAvg |
+|---|---|---|---|---|
+| **FedAvg** (single model) | nothing | 11.19M | **0.4895** | — |
+| split-depth 2 | conv1 + layer1 | 11.64M | 0.4036 | −0.086 |
+| independent experts | everything | 44.70M | 0.3478 | −0.142 |
+
+**Sharing the trunk recovered +5.6 points while cutting parameters 3.8×** — confirming the
+diagnosis: reduce the data-splitting cost and accuracy rises, exactly as predicted.
+
+But the trend keeps going in one direction. Less personalisation is monotonically better,
+and extrapolating the dial to its endpoint gives FedAvg — which is precisely what the
+measurements show. **On CIFAR-10 with 90° rotations, personalising the feature extractor
+costs more than it returns at every depth tested.** That is the finding.
+
+The likely reason is the shift itself: 90° rotations are exactly what rotation
+augmentation does, and one CNN absorbs them at modest capacity cost. The architecture is
+built to resolve gradient conflict that, in this benchmark, was never severe enough to pay
+for splitting the data. Testing on a *natural* domain gap — PACS, Digit-5, Office-Caltech —
+is the experiment that would give personalisation a fair chance.
 
 ---
 
@@ -191,19 +247,22 @@ the combiner.
 ## Status
 
 **Done** — clustering study (3 seeds, grid ablation, four signals compared); full-scale
-run at α = 0.5 with all four combiners and the oracle ceiling; implementation with
-14/14 invariants passing; harness, configs, aggregation and baselines.
+run at α = 0.5 with all four combiners, the oracle ceiling and the FedAvg baseline; a
+split-depth follow-up isolating data-splitting cost from specialisation benefit;
+implementation with 14/14 invariants passing; harness, configs, aggregation, baselines.
 
-**In progress** — the FedAvg row of the results table.
+**Not done** — multiple seeds; α = 0.1; the two single-axis controls (`rotation_only`,
+`dirichlet_only`); comparisons against FedBN, IFCA, CFL, LG-FedAvg, FedRoD; any dataset
+beyond CIFAR-10 or any non-synthetic feature shift. All are in `scripts/run_sweep.sh` and
+are compute-bound, not code-bound.
 
-**Not done** — multiple seeds and the `random` / `oracle` *assignment* ablations
-(both in `tier1` of the sweep, compute-bound not code-bound); α = 0.1; comparisons
-against FedBN, IFCA, CFL, LG-FedAvg, FedRoD; any dataset beyond CIFAR-10 or any
-non-synthetic feature shift.
+Note the `random`-assignment control is **no longer the decisive missing number**: it
+exists to rule out capacity as the explanation for an ensemble *win*, and the ensemble
+lost. The oracle ceiling sitting below FedAvg already establishes that no combination
+strategy closes the gap in this regime.
 
-Until the random-assignment control runs, any ensemble-vs-FedAvg gap is **not
-attributable** to clustering — K experts carry K× the parameters, and that confound
-has to be excluded before the comparison means anything.
+Results are one seed. The direction is unambiguous (a 14-point margin is not seed noise),
+but the exact magnitudes are not error-barred.
 
 Known limitations are documented rather than omitted —
 [`docs/REPORT.md`](docs/REPORT.md) §12, including K× inference cost, the absence

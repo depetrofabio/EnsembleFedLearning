@@ -63,6 +63,13 @@ reproduces v1's forward pass exactly (proof in [§4.2](#42-equivalence-to-v1)),
 so the comparison between "v1 behaviour" and "learned combination" is controlled:
 same experts, same data, same schedule, only the combination differs.
 
+> **How this turned out.** Making the combination trainable was necessary to ask
+> the question — but the measured answer (§10.3) was that **uniform averaging
+> wins**. Optimal routing is worth only +1.1 points over it, and every learned
+> combiner scored below it. The contribution is therefore the *measurement*, not
+> the mechanism: the original design's simple averaging was the right choice, and
+> this rewrite is what makes that statement falsifiable rather than assumed.
+
 ---
 
 ## 2. Defect → fix map
@@ -630,16 +637,89 @@ training happens during warmup at all, and the phase drops from ~20 minutes to
 seconds while still producing ARI 1.00 and perfectly balanced clusters. If you
 only need the feature axis, the warmup phase can be deleted outright.
 
-### 10.3 End-to-end pipeline
+### 10.3 Full-scale results
 
-The `fast` config runs all six phases to completion on a laptop: clustering,
-expert training, all four combiners fitted in dense rounds, routing diagnostics,
-the per-expert matrix, the oracle ceiling and the FedAvg baseline. Every code
-path executes and every artefact is written.
+*40 clients · full CIFAR-10 · 4 rotation groups · Dirichlet α = 0.5 · ResNet-18
+from scratch · 100 rounds at 25 % participation · batch 64 · lr 0.01 · GroupNorm ·
+no augmentation · seed 42.*
 
-**It does not produce a usable accuracy table, and it is worth being explicit
-about why.** From `results/fast/table.md` — every row lands at chance (~0.10),
-and the gate's routing accuracy is 0.25, exactly chance for 4 clusters:
+| method | 0° | 90° | 180° | 270° | **overall** |
+|---|---|---|---|---|---|
+| **FedAvg** (single model) | 0.4927 | 0.5017 | 0.4751 | 0.4886 | **0.4895** |
+| oracle expert *(ensemble ceiling)* | 0.4046 | 0.4352 | 0.2112 | 0.3839 | 0.3587 |
+| ensemble, `uniform` | 0.3519 | 0.3834 | 0.3172 | 0.3386 | 0.3478 |
+| ensemble, `beta` | 0.2696 | 0.4492 | 0.3007 | 0.3571 | 0.3442 |
+| ensemble, `mlp` | 0.3543 | 0.4359 | 0.2261 | 0.3474 | 0.3409 |
+| ensemble, `gate` | 0.2130 | 0.4445 | 0.2064 | 0.3918 | 0.3139 |
+| expert 0 alone | 0.1317 | 0.1022 | **0.2112** | 0.1144 | 0.1399 |
+| expert 1 alone | **0.4046** | 0.1400 | 0.2085 | 0.1478 | 0.2252 |
+| expert 2 alone | 0.1977 | **0.4352** | 0.1920 | 0.2356 | 0.2651 |
+| expert 3 alone | 0.1711 | 0.1927 | 0.1723 | **0.3839** | 0.2300 |
+
+Training was healthy throughout — validation accuracy 0.256 → 0.357 over the 100
+rounds, mean local loss 2.30 → 0.37 — so nothing below is an artefact of
+undertrained models.
+
+**FedAvg wins by 14.2 points, and the ensemble's own ceiling cannot reach it.**
+The oracle (0.3587) is 13 points *below* the single-model baseline. That is the
+decisive number: even granting perfect per-sample domain knowledge, the
+specialists lose. No combination strategy closes this gap, because the gap is not
+a combination problem.
+
+The cause is arithmetic. Partitioning 40 clients into 4 clusters gives each expert
+**a quarter of the data** — roughly 10k images for a ResNet-18 trained from
+scratch — while FedAvg's model sees all 40k. **Data-splitting cost exceeded
+specialisation benefit.** A secondary factor: 90° rotations are precisely what
+rotation augmentation does, and a single CNN absorbs them at modest capacity cost,
+so the gradient conflict this architecture exists to avoid was never severe enough
+to justify quartering the dataset.
+
+**Clustering recovered the domain structure exactly.** `act_stats` gave ARI 1.000
+against the rotation ground truth with perfectly balanced clusters `[10,10,10,10]`.
+
+**The experts specialised.** The oracle's best-expert-per-rotation selection,
+made on validation and then applied to test, is a **bijection**:
+
+```
+0° → expert 1     90° → expert 2     180° → expert 0     270° → expert 3
+```
+
+Every expert wins on exactly one domain and none wins twice, and the bold cells in
+the table above confirm it row-wise: each expert is roughly **2× better on its own
+domain than off it** (e.g. expert 1: 0.4046 on 0° against a 0.165 mean elsewhere).
+Undifferentiated experts cannot produce a permutation matrix. This is direct
+evidence that cluster-specific training did exactly what it was designed to do —
+which is what makes the overall loss to FedAvg a *scaling* result rather than a
+failure of the mechanism.
+
+**Ensembling also worked.** `uniform` (0.3478) beats the best individual expert
+(0.2651) by 8 points, so combining specialists is clearly better than picking one.
+It simply is not better than not partitioning the data at all.
+
+**The headroom for learned routing is only +1.1 points.** The gap between
+parameter-free averaging (0.3478) and a perfect oracle router (0.3587) bounds
+everything any combiner could win. Uniform averaging already captures ~90 % of it.
+That is a useful negative design result: it says a learned router is a poor
+trade *before* you build one, and it retroactively justifies the original
+formulation's simple averaging over the machinery in §4.3.
+
+**The learned gate failed, and the cause is identified.** It routes at 0.273
+against a 0.25 chance level — essentially not routing — and is consequently the
+*worst* combiner rather than the best. Its dense-round loss oscillated
+(1.00 → 1.90 → 1.20) instead of descending. The cause is the design choice in
+§4.3: the gate is fed *confidence summaries* (per-expert entropy, max-probability,
+margin) rather than the input image, to keep it at ~1k parameters. When experts
+are not confidently distinguishable on a sample, that summary carries no signal
+and the gate degenerates. A small CNN routing on `x` would be robust to this, at
+the cost of one extra forward pass. Given the measured +1.1-point ceiling, the
+better conclusion is that the routing problem was not worth solving here.
+
+### 10.4 Why subsampled configs cannot substitute
+
+The `fast` config runs all six phases to completion on a laptop, and every code
+path executes. **It does not produce a usable accuracy table, and it is worth
+being explicit about why.** Every row lands at chance (~0.10), and the gate's
+routing accuracy is 0.25, exactly chance for 4 clusters:
 
 | method | 0deg | 90deg | 180deg | 270deg | overall |
 |---|---|---|---|---|---|
@@ -700,30 +780,37 @@ The one result in this report that does **not** need that compute is the
 clustering study (§10.1–10.2) — `act_stats` requires no training at all, which is
 precisely what makes it worth reporting on its own.
 
-### 10.4 The full run
+### 10.5 What is still missing, and why it matters
 
-`configs/rotation_dirichlet_mps.json` is the same experiment sized for an
-Apple-silicon laptop (~5–7 h; run it under `caffeinate -dimsu`). It delivers the
-≈ 8,000 steps per expert computed above, which is the threshold this section
-says the accuracy table needs. Results land in
-`results/rotation_dirichlet_seed42/` — `table.md` for the headline table,
-`results.json` for everything else.
+The §10.3 table is **one seed and one setting**. A 14-point margin is not seed
+noise, so the direction is safe; the magnitudes are not error-barred.
 
-When it finishes, the checks that tell you whether the result is real, in order:
+What remains, in order of what it would actually teach you:
 
-1. **Does the per-expert block have a diagonal?** Expert *k* should win on
-   rotation *k*. No diagonal ⇒ the experts did not specialise, and nothing below
-   this line is worth reading.
-2. **Is the oracle above FedAvg?** If the ceiling sits below the single-model
-   baseline, the experts are still undertrained (as in §10.3).
-3. **Does the gate beat uniform, and how close does it get to the oracle?**
-   That gap is what routing costs.
-4. **Then run `--assignment random`** at the same budget. If learned clustering
-   does not beat random assignment, the gain was capacity, not clustering — and
-   that is the number a reviewer will ask for first.
+1. **`rotation_only` (α = 100).** The most informative missing run. It removes
+   label skew entirely, so each expert still gets a quarter of the data but the
+   remaining heterogeneity is *purely* the axis clustering targets. If the
+   ensemble cannot win there, it cannot win anywhere in this design.
+2. **Fewer clusters (K = 2).** Directly trades specialisation against the
+   data-splitting cost this experiment identified as decisive. K = 2 halves rather
+   than quarters the data per expert.
+3. **Seeds beyond 42**, for error bars on the magnitudes.
+4. **`dirichlet_only`.** Expected to show little gain — with no feature shift all
+   experts see the same input distribution and converge to near-identical
+   functions. Worth reporting honestly rather than omitting.
 
-Repeat for seeds beyond 42 before drawing conclusions; clustering is a discrete
-step and one seed is not evidence.
+Note the `random`-assignment control has been **demoted**. It exists to rule out
+capacity as the explanation for an ensemble *win*; the ensemble lost, and the
+oracle ceiling already establishes that no combination strategy closes the gap.
+It is still worth running for completeness, but it is no longer decisive.
+
+All are in `scripts/run_sweep.sh`. They are compute-bound, not code-bound.
+
+One further caveat that bounds the headline clustering result: ARI = 1.00 from an
+**untrained** network means 90° rotations are an easy shift to detect. That is
+strong evidence the 8.4M-dimensional gradient signature is unnecessary, and weak
+evidence the approach transfers to subtler domain gaps — sensor, colour, style.
+A natural-shift benchmark (PACS, Digit-5, FEMNIST) is the obvious next test.
 
 ---
 
@@ -785,11 +872,16 @@ Useful overrides: `--assignment {learned,random,oracle}`, `--cluster_signal
 
 Stated plainly, because each is a question a reviewer will ask.
 
+- **The gate's routing input is the wrong feature, and it is measured.** Routing
+  accuracy 0.273 against a 0.25 chance level (§10.3). Feeding the gate per-expert
+  confidence summaries instead of the input image keeps it at ~1k parameters, but
+  it degenerates whenever the experts are not confidently distinguishable on a
+  sample. A small CNN on `x` would fix it at the cost of one forward pass —
+  though the measured +1.1-point ceiling says the fix is not worth much here.
 - **Inference cost is K× FLOPs.** Every combiner here evaluates all K backbones.
-  Top-1 routing (evaluate the gate on a cheap probe, then run one backbone) would
-  bring inference cost back to FedAvg's, and the gate architecture already
-  supports it, but it is not implemented. This is the most valuable next
-  addition.
+  Top-1 routing (evaluate a cheap probe, then run one backbone) would bring
+  inference cost back to FedAvg's, but it is not implemented — and note it
+  depends on a routing signal that currently does not work.
 - **Dense rounds cost K× download** on the rounds where they run. Reported, not
   hidden.
 - **Privacy.** Nothing here shares raw data, but sharing Δθ is exactly the input
@@ -826,29 +918,45 @@ Stated plainly, because each is a question a reviewer will ask.
 The framing this implementation supports:
 
 > Heterogeneity has two axes, and they want opposite treatment. Feature shift is
-> a shallow, local phenomenon — it is visible in stem activation statistics
-> before any training, and it is handled by personalised early computation.
-> Label skew is a deep, global phenomenon — it is handled by a shared head and a
-> shared prior. Clustering on the wrong axis conflates them; clustering on the
-> right one gives you a router for free.
+> a shallow, local phenomenon — visible in stem activation statistics *before any
+> training* — and it is handled by personalised early computation. Label skew is
+> a deep, global phenomenon, handled by a shared head and a shared prior.
+> Clustering on the wrong axis conflates them; separating them turns out to be
+> nearly free.
 
 Concrete claims this repository can support, in order of strength:
 
 1. **The feature axis is recoverable at essentially zero cost.** Gridded stem
-   statistics on an untrained backbone, ~320 dims, ARI 1.00 / 0.88. The
-   grid=1 vs grid=2 contrast makes it a finding rather than an implementation
-   note. (Measured; §5.4.)
-2. **The combination must be trained, and training it is cheap.** Uniform
-   averaging is a constant no gradient saw; dense rounds cost a few thousand
-   parameters of communication. The uniform-vs-gate row pair is the experiment.
-3. **Clustering must beat random assignment at matched capacity.** The
-   `--assignment random` control. Without this row, nothing else is falsifiable.
-4. **Rotation should be the main experiment, not the validation.** Under
-   Dirichlet-only heterogeneity all experts see the same input distribution and
-   converge to near-identical functions, so the ensemble has little to combine.
-   Under rotation, diversity is forced. Present Dirichlet-only as an honest
-   limitation section rather than the headline.
+   statistics on an untrained backbone, ~320 dims, ARI 1.00 against rotation and
+   ~0.02 against labels, versus 0.55 for the 8.4M-dimensional gradient
+   signature. The grid=1 vs grid=2 contrast makes it a finding rather than an
+   implementation note. (Measured; §5.4, §10.2.)
+2. **Cluster-specific training produces genuine domain specialists.** The
+   oracle's expert→domain assignment is a bijection and each expert is ~2× better
+   on its own domain (§10.3). Direct evidence, independent of any baseline.
+3. **Under combined rotation + Dirichlet shift on CIFAR-10, the approach loses to
+   FedAvg by 14 points — and the ensemble's own oracle ceiling sits 13 points
+   below it.** Every component worked; partitioning the data was the binding
+   constraint. This is the paper's most defensible empirical claim, and it is a
+   *negative* one. (§10.3.)
+4. **The headroom for learned combination is small, and was measured before
+   being spent.** Optimal routing is worth **+1.1 points** over parameter-free
+   averaging; every learned combiner scored below it. A quantified argument for
+   the simplest possible combiner. (§10.3.)
 
-The most valuable single addition beyond what is here: **top-1 routing at
-inference**, which turns "K× cost for an accuracy gain" into "FedAvg cost for an
-accuracy gain" and makes the capacity objection disappear.
+**A claim an earlier draft of this report made and the data does not support:**
+"the combination must be trained." Measured, learned combiners were *worse* than
+uniform averaging (0.3442 / 0.3409 / 0.3139 vs 0.3478). The defensible version is
+narrower: the original formulation's combination was untrainable *by
+construction*, which is a design flaw worth fixing so the question can be asked —
+and once asked, the answer here was that the simple rule wins.
+
+Expected but unverified: under Dirichlet-only heterogeneity all experts see the
+same input distribution and converge to near-identical functions, so the ensemble
+should have little to combine. `dirichlet_only` in `tier1` tests it; present it
+as an honest limitation rather than omitting it.
+
+The most valuable single addition beyond what is here: a **shared trunk with
+per-cluster adapters** instead of K full backbones. It keeps specialisation while
+removing both the K× parameter confound and the data-splitting cost that is the
+method's fundamental constraint.

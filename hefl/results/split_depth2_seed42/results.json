@@ -1,0 +1,708 @@
+{
+  "config": {
+    "split_depth": 2,
+    "num_clients": 40,
+    "num_clusters": 4,
+    "alpha": 0.5,
+    "rounds": 100,
+    "fraction": 0.25,
+    "local_epochs": 2,
+    "batch_size": 64,
+    "lr": 0.01,
+    "eval_every": 10,
+    "seed": 42,
+    "subsample": null,
+    "data_root": "./data_cache",
+    "fedavg_reference": 0.4895,
+    "output_dir": null
+  },
+  "clustering_ari_rotation": 1.0,
+  "cluster_sizes": [
+    10,
+    10,
+    10,
+    10
+  ],
+  "parameters": {
+    "personal": 599296,
+    "shared": 11019008,
+    "heads": 20490,
+    "total": 11638794
+  },
+  "ensemble": {
+    "test": {
+      "rot_0": 0.4216,
+      "rot_1": 0.406,
+      "rot_2": 0.3944,
+      "rot_3": 0.3924,
+      "overall": 0.4036
+    }
+  },
+  "oracle": {
+    "test": {
+      "rot_0": 0.4216,
+      "rot_1": 0.406,
+      "rot_2": 0.3944,
+      "rot_3": 0.3924,
+      "overall": 0.4036
+    },
+    "expert_per_rotation": {
+      "0": 0,
+      "1": 0,
+      "2": 0,
+      "3": 0
+    }
+  },
+  "expert_matrix": [
+    [
+      0.4216,
+      0.406,
+      0.3944,
+      0.3924
+    ],
+    [
+      0.4216,
+      0.406,
+      0.3944,
+      0.3924
+    ],
+    [
+      0.4216,
+      0.406,
+      0.3944,
+      0.3924
+    ],
+    [
+      0.4216,
+      0.406,
+      0.3944,
+      0.3924
+    ]
+  ],
+  "fedavg_reference": 0.4895,
+  "delta_vs_fedavg": -0.08589999999999998,
+  "delta_vs_independent_experts": 0.055800000000000016,
+  "history": [
+    {
+      "round": 1,
+      "kind": "split",
+      "mean_local_loss": 2.052229582408217,
+      "participants": 10
+    },
+    {
+      "round": 2,
+      "kind": "split",
+      "mean_local_loss": 1.7965512016098935,
+      "participants": 10
+    },
+    {
+      "round": 3,
+      "kind": "split",
+      "mean_local_loss": 1.7360501964143904,
+      "participants": 10
+    },
+    {
+      "round": 4,
+      "kind": "split",
+      "mean_local_loss": 1.7246651038557435,
+      "participants": 10
+    },
+    {
+      "round": 5,
+      "kind": "split",
+      "mean_local_loss": 1.8081398819239312,
+      "participants": 10
+    },
+    {
+      "round": 6,
+      "kind": "split",
+      "mean_local_loss": 1.6521991760527144,
+      "participants": 10
+    },
+    {
+      "round": 7,
+      "kind": "split",
+      "mean_local_loss": 1.5272322630349477,
+      "participants": 10
+    },
+    {
+      "round": 8,
+      "kind": "split",
+      "mean_local_loss": 1.635508496017143,
+      "participants": 10
+    },
+    {
+      "round": 9,
+      "kind": "split",
+      "mean_local_loss": 1.4112147217837616,
+      "participants": 10
+    },
+    {
+      "round": 10,
+      "kind": "split",
+      "mean_local_loss": 1.500518562621441,
+      "participants": 10,
+      "val_accuracy": 0.21265,
+      "val_loss": 2.1668169921875
+    },
+    {
+      "round": 11,
+      "kind": "split",
+      "mean_local_loss": 1.4811627267869676,
+      "participants": 10
+    },
+    {
+      "round": 12,
+      "kind": "split",
+      "mean_local_loss": 1.471987788134005,
+      "participants": 10
+    },
+    {
+      "round": 13,
+      "kind": "split",
+      "mean_local_loss": 1.4294285896562493,
+      "participants": 10
+    },
+    {
+      "round": 14,
+      "kind": "split",
+      "mean_local_loss": 1.4259532580665037,
+      "participants": 10
+    },
+    {
+      "round": 15,
+      "kind": "split",
+      "mean_local_loss": 1.4179768178648513,
+      "participants": 10
+    },
+    {
+      "round": 16,
+      "kind": "split",
+      "mean_local_loss": 1.3533129319383783,
+      "participants": 10
+    },
+    {
+      "round": 17,
+      "kind": "split",
+      "mean_local_loss": 1.361487042907935,
+      "participants": 10
+    },
+    {
+      "round": 18,
+      "kind": "split",
+      "mean_local_loss": 1.4658827804257855,
+      "participants": 10
+    },
+    {
+      "round": 19,
+      "kind": "split",
+      "mean_local_loss": 1.386941567983421,
+      "participants": 10
+    },
+    {
+      "round": 20,
+      "kind": "split",
+      "mean_local_loss": 1.2216434121234365,
+      "participants": 10,
+      "val_accuracy": 0.264,
+      "val_loss": 2.0497651191711426
+    },
+    {
+      "round": 21,
+      "kind": "split",
+      "mean_local_loss": 1.2606329403221717,
+      "participants": 10
+    },
+    {
+      "round": 22,
+      "kind": "split",
+      "mean_local_loss": 1.2962954080552511,
+      "participants": 10
+    },
+    {
+      "round": 23,
+      "kind": "split",
+      "mean_local_loss": 1.2365385009984506,
+      "participants": 10
+    },
+    {
+      "round": 24,
+      "kind": "split",
+      "mean_local_loss": 1.0945435693882526,
+      "participants": 10
+    },
+    {
+      "round": 25,
+      "kind": "split",
+      "mean_local_loss": 1.2233181317325357,
+      "participants": 10
+    },
+    {
+      "round": 26,
+      "kind": "split",
+      "mean_local_loss": 1.241589451364008,
+      "participants": 10
+    },
+    {
+      "round": 27,
+      "kind": "split",
+      "mean_local_loss": 1.2185831396881013,
+      "participants": 10
+    },
+    {
+      "round": 28,
+      "kind": "split",
+      "mean_local_loss": 1.2296662448831719,
+      "participants": 10
+    },
+    {
+      "round": 29,
+      "kind": "split",
+      "mean_local_loss": 1.1131428958144567,
+      "participants": 10
+    },
+    {
+      "round": 30,
+      "kind": "split",
+      "mean_local_loss": 1.0754925344900172,
+      "participants": 10,
+      "val_accuracy": 0.33165,
+      "val_loss": 1.7673072706222535
+    },
+    {
+      "round": 31,
+      "kind": "split",
+      "mean_local_loss": 1.119638053448114,
+      "participants": 10
+    },
+    {
+      "round": 32,
+      "kind": "split",
+      "mean_local_loss": 1.1857263265572098,
+      "participants": 10
+    },
+    {
+      "round": 33,
+      "kind": "split",
+      "mean_local_loss": 1.0895741087318496,
+      "participants": 10
+    },
+    {
+      "round": 34,
+      "kind": "split",
+      "mean_local_loss": 1.1050380286956594,
+      "participants": 10
+    },
+    {
+      "round": 35,
+      "kind": "split",
+      "mean_local_loss": 1.1968188526360233,
+      "participants": 10
+    },
+    {
+      "round": 36,
+      "kind": "split",
+      "mean_local_loss": 1.00254363919526,
+      "participants": 10
+    },
+    {
+      "round": 37,
+      "kind": "split",
+      "mean_local_loss": 1.1612548883802998,
+      "participants": 10
+    },
+    {
+      "round": 38,
+      "kind": "split",
+      "mean_local_loss": 1.0796818280320009,
+      "participants": 10
+    },
+    {
+      "round": 39,
+      "kind": "split",
+      "mean_local_loss": 1.0343482306892502,
+      "participants": 10
+    },
+    {
+      "round": 40,
+      "kind": "split",
+      "mean_local_loss": 0.9711307328940558,
+      "participants": 10,
+      "val_accuracy": 0.3327,
+      "val_loss": 1.898162878036499
+    },
+    {
+      "round": 41,
+      "kind": "split",
+      "mean_local_loss": 1.0681617416832514,
+      "participants": 10
+    },
+    {
+      "round": 42,
+      "kind": "split",
+      "mean_local_loss": 1.0605432233390224,
+      "participants": 10
+    },
+    {
+      "round": 43,
+      "kind": "split",
+      "mean_local_loss": 1.0762264634167713,
+      "participants": 10
+    },
+    {
+      "round": 44,
+      "kind": "split",
+      "mean_local_loss": 0.9715285044142273,
+      "participants": 10
+    },
+    {
+      "round": 45,
+      "kind": "split",
+      "mean_local_loss": 0.9859807320077062,
+      "participants": 10
+    },
+    {
+      "round": 46,
+      "kind": "split",
+      "mean_local_loss": 0.8485095936926179,
+      "participants": 10
+    },
+    {
+      "round": 47,
+      "kind": "split",
+      "mean_local_loss": 0.9650748784176633,
+      "participants": 10
+    },
+    {
+      "round": 48,
+      "kind": "split",
+      "mean_local_loss": 0.9214123243334248,
+      "participants": 10
+    },
+    {
+      "round": 49,
+      "kind": "split",
+      "mean_local_loss": 0.8972601100499737,
+      "participants": 10
+    },
+    {
+      "round": 50,
+      "kind": "split",
+      "mean_local_loss": 1.076594374222475,
+      "participants": 10,
+      "val_accuracy": 0.35835,
+      "val_loss": 1.8952591480255128
+    },
+    {
+      "round": 51,
+      "kind": "split",
+      "mean_local_loss": 0.9957651121754347,
+      "participants": 10
+    },
+    {
+      "round": 52,
+      "kind": "split",
+      "mean_local_loss": 0.9109665879692551,
+      "participants": 10
+    },
+    {
+      "round": 53,
+      "kind": "split",
+      "mean_local_loss": 0.9362616575890785,
+      "participants": 10
+    },
+    {
+      "round": 54,
+      "kind": "split",
+      "mean_local_loss": 0.9037645250552367,
+      "participants": 10
+    },
+    {
+      "round": 55,
+      "kind": "split",
+      "mean_local_loss": 0.8693575241546583,
+      "participants": 10
+    },
+    {
+      "round": 56,
+      "kind": "split",
+      "mean_local_loss": 0.8633373252751697,
+      "participants": 10
+    },
+    {
+      "round": 57,
+      "kind": "split",
+      "mean_local_loss": 0.7741336886490601,
+      "participants": 10
+    },
+    {
+      "round": 58,
+      "kind": "split",
+      "mean_local_loss": 0.8851151584983109,
+      "participants": 10
+    },
+    {
+      "round": 59,
+      "kind": "split",
+      "mean_local_loss": 0.8294575323049989,
+      "participants": 10
+    },
+    {
+      "round": 60,
+      "kind": "split",
+      "mean_local_loss": 0.9208835010572235,
+      "participants": 10,
+      "val_accuracy": 0.36355,
+      "val_loss": 1.7335428407669067
+    },
+    {
+      "round": 61,
+      "kind": "split",
+      "mean_local_loss": 0.7597134348103763,
+      "participants": 10
+    },
+    {
+      "round": 62,
+      "kind": "split",
+      "mean_local_loss": 0.8389604073750819,
+      "participants": 10
+    },
+    {
+      "round": 63,
+      "kind": "split",
+      "mean_local_loss": 0.716355742839778,
+      "participants": 10
+    },
+    {
+      "round": 64,
+      "kind": "split",
+      "mean_local_loss": 0.871259630222811,
+      "participants": 10
+    },
+    {
+      "round": 65,
+      "kind": "split",
+      "mean_local_loss": 0.7928929078480766,
+      "participants": 10
+    },
+    {
+      "round": 66,
+      "kind": "split",
+      "mean_local_loss": 0.88883696960841,
+      "participants": 10
+    },
+    {
+      "round": 67,
+      "kind": "split",
+      "mean_local_loss": 0.6944809535831346,
+      "participants": 10
+    },
+    {
+      "round": 68,
+      "kind": "split",
+      "mean_local_loss": 0.8386074912301419,
+      "participants": 10
+    },
+    {
+      "round": 69,
+      "kind": "split",
+      "mean_local_loss": 0.8264623787130523,
+      "participants": 10
+    },
+    {
+      "round": 70,
+      "kind": "split",
+      "mean_local_loss": 0.7088618085006597,
+      "participants": 10,
+      "val_accuracy": 0.37395,
+      "val_loss": 1.8019276123046875
+    },
+    {
+      "round": 71,
+      "kind": "split",
+      "mean_local_loss": 0.8305991288109429,
+      "participants": 10
+    },
+    {
+      "round": 72,
+      "kind": "split",
+      "mean_local_loss": 0.788597180819577,
+      "participants": 10
+    },
+    {
+      "round": 73,
+      "kind": "split",
+      "mean_local_loss": 0.7475213764415425,
+      "participants": 10
+    },
+    {
+      "round": 74,
+      "kind": "split",
+      "mean_local_loss": 0.8038314818376587,
+      "participants": 10
+    },
+    {
+      "round": 75,
+      "kind": "split",
+      "mean_local_loss": 0.6013389949482787,
+      "participants": 10
+    },
+    {
+      "round": 76,
+      "kind": "split",
+      "mean_local_loss": 0.8134975464744176,
+      "participants": 10
+    },
+    {
+      "round": 77,
+      "kind": "split",
+      "mean_local_loss": 0.674163574052238,
+      "participants": 10
+    },
+    {
+      "round": 78,
+      "kind": "split",
+      "mean_local_loss": 0.8228731414730943,
+      "participants": 10
+    },
+    {
+      "round": 79,
+      "kind": "split",
+      "mean_local_loss": 0.6433930367185009,
+      "participants": 10
+    },
+    {
+      "round": 80,
+      "kind": "split",
+      "mean_local_loss": 0.7250573898694002,
+      "participants": 10,
+      "val_accuracy": 0.3949,
+      "val_loss": 1.7426154457092284
+    },
+    {
+      "round": 81,
+      "kind": "split",
+      "mean_local_loss": 0.5951848451710224,
+      "participants": 10
+    },
+    {
+      "round": 82,
+      "kind": "split",
+      "mean_local_loss": 0.6366017849111937,
+      "participants": 10
+    },
+    {
+      "round": 83,
+      "kind": "split",
+      "mean_local_loss": 0.6193084946104694,
+      "participants": 10
+    },
+    {
+      "round": 84,
+      "kind": "split",
+      "mean_local_loss": 0.6873066233388603,
+      "participants": 10
+    },
+    {
+      "round": 85,
+      "kind": "split",
+      "mean_local_loss": 0.6650460846920493,
+      "participants": 10
+    },
+    {
+      "round": 86,
+      "kind": "split",
+      "mean_local_loss": 0.776003902586941,
+      "participants": 10
+    },
+    {
+      "round": 87,
+      "kind": "split",
+      "mean_local_loss": 0.5685170964986829,
+      "participants": 10
+    },
+    {
+      "round": 88,
+      "kind": "split",
+      "mean_local_loss": 0.6567857871247116,
+      "participants": 10
+    },
+    {
+      "round": 89,
+      "kind": "split",
+      "mean_local_loss": 0.5676815896109297,
+      "participants": 10
+    },
+    {
+      "round": 90,
+      "kind": "split",
+      "mean_local_loss": 0.5870484907401092,
+      "participants": 10,
+      "val_accuracy": 0.37135,
+      "val_loss": 1.8871157897949218
+    },
+    {
+      "round": 91,
+      "kind": "split",
+      "mean_local_loss": 0.41959761358955794,
+      "participants": 10
+    },
+    {
+      "round": 92,
+      "kind": "split",
+      "mean_local_loss": 0.487756483556198,
+      "participants": 10
+    },
+    {
+      "round": 93,
+      "kind": "split",
+      "mean_local_loss": 0.615658584916252,
+      "participants": 10
+    },
+    {
+      "round": 94,
+      "kind": "split",
+      "mean_local_loss": 0.48988258745990293,
+      "participants": 10
+    },
+    {
+      "round": 95,
+      "kind": "split",
+      "mean_local_loss": 0.6394139102684976,
+      "participants": 10
+    },
+    {
+      "round": 96,
+      "kind": "split",
+      "mean_local_loss": 0.5913546206758891,
+      "participants": 10
+    },
+    {
+      "round": 97,
+      "kind": "split",
+      "mean_local_loss": 0.5109138979795482,
+      "participants": 10
+    },
+    {
+      "round": 98,
+      "kind": "split",
+      "mean_local_loss": 0.5275875700111493,
+      "participants": 10
+    },
+    {
+      "round": 99,
+      "kind": "split",
+      "mean_local_loss": 0.5136733799803739,
+      "participants": 10
+    },
+    {
+      "round": 100,
+      "kind": "split",
+      "mean_local_loss": 0.719466438570952,
+      "participants": 10,
+      "val_accuracy": 0.39765,
+      "val_loss": 1.7818266469955444
+    }
+  ],
+  "runtime_seconds": 22099.254508018494
+}
