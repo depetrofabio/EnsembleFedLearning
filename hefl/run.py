@@ -305,6 +305,11 @@ def main() -> None:
     results["history"] = [vars(r) for r in trainer.history]
     results["runtime_seconds"] = time.time() - started
 
+    # Re-create the output directory before writing: a long run can outlive
+    # the directory it was launched against (renamed, unmounted, cleaned up),
+    # and losing hours of finished compute to a missing folder is unacceptable.
+    out.mkdir(parents=True, exist_ok=True)
+
     (out / "results.json").write_text(json.dumps(results, indent=2, default=float))
     (out / "table.md").write_text(table + "\n")
     (out / "config_used.json").write_text(json.dumps(cfg, indent=2))

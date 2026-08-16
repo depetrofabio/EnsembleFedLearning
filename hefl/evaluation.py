@@ -52,7 +52,11 @@ def accuracy_per_rotation(
         correct, seen = 0, 0
         for batch in loader:
             x, y = batch[0].to(device), batch[1].to(device)
-            logits = model(x, active=active) if isinstance(model, ClusterEnsemble) else model(x)
+            # Duck-typing, not isinstance: SplitEnsemble is not a ClusterEnsemble
+            # subclass, and an isinstance check silently DROPPED `active` for it,
+            # making every "expert k only" row identical to the full ensemble.
+            supports_active = hasattr(model, "expert_logits")
+            logits = model(x, active=active) if supports_active else model(x)
             if isinstance(logits, tuple):
                 logits = logits[0]
             correct += (logits.argmax(1) == y).sum().item()
