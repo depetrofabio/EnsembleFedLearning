@@ -236,40 +236,4 @@ docs/METHOD.md         technical description of the original formulation
 python -m hefl.test_invariants
 ```
 
-14 checks on the properties that are easy to break silently: that `uniform`
-reproduces the classic forward pass, that single-expert evaluation equals local
-client training exactly, that combination weights sum to 1 over every subset,
-that aggregation does not dilute updates, and that both dense-round modes move
-the combiner.
 
----
-
-## Status
-
-**Done** — clustering study (3 seeds, grid ablation, four signals compared); full-scale
-run at α = 0.5 with all four combiners, the oracle ceiling and the FedAvg baseline; a
-split-depth follow-up isolating data-splitting cost from specialisation benefit;
-implementation with 14/14 invariants passing; harness, configs, aggregation, baselines.
-
-**Not done** — multiple seeds; α = 0.1; the two single-axis controls (`rotation_only`,
-`dirichlet_only`); comparisons against FedBN, IFCA, CFL, LG-FedAvg, FedRoD; any dataset
-beyond CIFAR-10 or any non-synthetic feature shift. All are in `scripts/run_sweep.sh` and
-are compute-bound, not code-bound.
-
-Note the `random`-assignment control is **no longer the decisive missing number**: it
-exists to rule out capacity as the explanation for an ensemble *win*, and the ensemble
-lost. The oracle ceiling sitting below FedAvg already establishes that no combination
-strategy closes the gap in this regime.
-
-Results are one seed. The direction is unambiguous (a 14-point margin is not seed noise),
-but the exact magnitudes are not error-barred.
-
-Known limitations are documented rather than omitted —
-[`docs/REPORT.md`](docs/REPORT.md) §12, including K× inference cost, the absence
-of top-1 routing, and the gate's collapse mode when experts are undertrained.
-
----
-
-## License
-
-MIT — see [`LICENSE`](LICENSE).
